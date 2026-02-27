@@ -11,80 +11,98 @@ POSTS = [
 ]
 
 
-
-
 @app.route('/api/posts', methods=['GET', 'POST'])
 def get_posts():
     app.logger.info('GET request received for /api/posts')
     sort = request.args.get('sort')
     direction = request.args.get('direction')
+
+    # Requirement: Invalid direction values must return a 400
+    if direction not in ['asc', 'desc']:
+        return jsonify({"error": "Invalid direction. Must be 'asc' or 'desc'."}), 400
+    # Requirement: Handle empty list case
+    if not POSTS:
+        return jsonify([])
+
     if request.method == 'POST':
-        # Get the new book data from the client
+        # Get the new post data from the client
         new_post = request.get_json()
         if not validate_post_data(new_post):
             return jsonify({"error": "Invalid posts data"}), 400
-            # Generate a new ID for the book
-        new_id = max(book['id'] for book in POSTS) + 1
+            # Generate a new ID for the post
+        new_id = max(post['id'] for post in POSTS) + 1
         new_post['id'] = new_id
 
-        # Add the new book to our list
+        # Add the new post to our list
         POSTS.append(new_post)
 
-        # Return the new book data to the client
+        # Return the new post data to the client
         return jsonify(new_post), 201
-    elif sort is not None or direction is not None:
-        POSTS.sort(key=lambda x: x[sort], reverse = direction=='desc')
-        return jsonify(POSTS), 200
-    else:
-        return jsonify(POSTS)
+    elif sort:
+        if sort not in ['title', 'content']:
+            return jsonify({"error": f"Invalid sort field: {sort}"}), 400
 
-# def myFunc(e):
-#   return e['year']
+        reverse = (direction == 'desc')
+        sorted_posts = sorted(POSTS, key=lambda x: x[sort].lower(), reverse=reverse)
+        return jsonify(sorted_posts)
+    return jsonify(POSTS)
+
+
 @app.route('/api/posts/<int:id>', methods=['PUT'])
 def update_post(id):
-    # Find the book with the given ID
+    # Find the post with the given ID
     post = find_post_by_id(id)
 
-    # If the book wasn't found, return a 404 error
+    # If the post wasn't found, return a 404 error
     if post is None:
         return 'Post with id {id} doesn\'t exist', 404
 
-    # Update the book with the new data
+    # Update the post with the new data
     new_data = request.get_json()
     post.update(new_data)
 
-    # Return the updated book
+    # Return the updated post
     return jsonify(post),200
 
 
 @app.route('/api/posts/<int:id>', methods=['DELETE'])
 def delete_post(id):
-    # Find the book with the given ID
+    # Find the post with the given ID
     post = find_post_by_id(id)
 
-    # If the book wasn't found, return a 404 error
+    # If the post wasn't found, return a 404 error
     if post is None:
         return f'Post with id {id} doesn\'t exist', 404
     if post["id"] == id:
         POSTS.remove(post)
-    # Remove the book from the list
+    # Remove the post from the list
     # TODO: implement this
     ...
 
-    # Return the deleted book
+    # Return the deleted post
     return jsonify(f"Post with id {id} has been deleted successfully."),200
 
 
 @app.route('/api/posts/search', methods=['GET'])
 def search_posts():
-    query = request.args.get('title','content')
-    # 2. Filter posts where query is in title OR content
-    results = [
-        post for post in POSTS
-        if query in post['title'].lower() or query in post['content'].lower()
-    ]
-    return jsonify(results), 200
+    # Read parameters separately
+    title = request.args.get('title','')
+    content = request.args.get('content','')
 
+    filtered_posts = []
+
+    for post in POSTS:
+        # Check if title matches (if title param provided)
+        title_match = title in post['title'].lower() if title else True
+        # Check if content matches (if content param provided)
+        content_match = content in post['content'].lower() if content else True
+
+        if title_match and content_match:
+            # Avoid returning everything if both params are empty (optional, depending on preference)
+            if not title and not content:
+                continue
+            filtered_posts.append(post)
+    return jsonify(filtered_posts), 200
 
 
 def validate_post_data(data):
@@ -94,17 +112,19 @@ def validate_post_data(data):
 
 
 def find_post_by_id(post_id):
-    """ Find the book with the id `book_id`.
-    If there is no book with this id, return None. """
+    """ Find the post with the id `post_id`.
+    If there is no post with this id, return None. """
     post_to_update = next((post for post in POSTS if post['id'] == post_id), None)
     # TODO: implement this
     return post_to_update
 
-def find_post_by_title(title):
 
+def find_post_by_title(title):
     post_to_update = next((post for post in POSTS if post['title'] == title), None)
     # TODO: implement this
     return post_to_update
+
+
 @app.errorhandler(404)
 def not_found_error(error):
     return jsonify({"error": error}), 404
