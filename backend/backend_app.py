@@ -13,13 +13,6 @@ POSTS = [
 
 @app.route('/api/posts', methods=['GET', 'POST'])
 def get_posts():
-    app.logger.info('GET request received for /api/posts')
-    sort = request.args.get('sort')
-    direction = request.args.get('direction')
-
-    # Requirement: Invalid direction values must return a 400
-    if direction not in ['asc', 'desc']:
-        return jsonify({"error": "Invalid direction. Must be 'asc' or 'desc'."}), 400
     # Requirement: Handle empty list case
     if not POSTS:
         return jsonify([])
@@ -38,10 +31,17 @@ def get_posts():
 
         # Return the new post data to the client
         return jsonify(new_post), 201
-    elif sort:
+
+    app.logger.info('GET request received for /api/posts')
+    sort = request.args.get('sort')
+    direction = request.args.get('direction')
+
+    if sort:
         if sort not in ['title', 'content']:
             return jsonify({"error": f"Invalid sort field: {sort}"}), 400
-
+        # Requirement: Invalid direction values must return a 400
+        if direction not in ['asc', 'desc']:
+            return jsonify({"error": "Invalid direction. Must be 'asc' or 'desc'."}), 400
         reverse = (direction == 'desc')
         sorted_posts = sorted(POSTS, key=lambda x: x[sort].lower(), reverse=reverse)
         return jsonify(sorted_posts)
@@ -73,8 +73,7 @@ def delete_post(id):
     # If the post wasn't found, return a 404 error
     if post is None:
         return f'Post with id {id} doesn\'t exist', 404
-    if post["id"] == id:
-        POSTS.remove(post)
+    POSTS.remove(post)
     # Remove the post from the list
     # TODO: implement this
     ...
